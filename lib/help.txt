@@ -1,0 +1,21 @@
+Program:
+  mg
+
+Description:
+  Migrate everything
+
+Usage:
+  mg --create <name>...
+  mg --migrate [<optional_version_number>]
+  mg --rollback [<optional_version_number>]
+  mg -h | --help
+  mg --version
+
+Options:
+  -h --help                             Show this screen.
+  --version                             Show version.
+  --create <name>                       Crates a migration file in ./migrations.
+  --migrate <optional_version_number>   Runs the migrations up to the latest version or the version specified.
+  -m                                    Runs the migrations up to the latest version.
+  --rollback <optional_version_number>  Runs the migrations down one version or the version specified.
+  -m                                    Runs the migrations down one version.

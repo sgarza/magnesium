@@ -1,0 +1,30 @@
+{
+  "name": "magnesium",
+  "version": "1.0.0",
+  "description": "Database Migrations for ECMAScript",
+  "bin": {
+    "mg": "mg.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "database",
+    "migration",
+    "neon",
+    "node",
+    "mysql"
+  ],
+  "author": "Sergio de la Garza",
+  "license": "ISC",
+  "engines": {
+    "node": ">=0.10"
+  },
+  "dependencies": {
+    "colors": "^1.0.3",
+    "inflection": "^1.5.3",
+    "mysql": "^2.5.4",
+    "neon": "^2.0.0",
+    "nopt": "^3.0.1"
+  }
+}
