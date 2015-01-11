@@ -13,10 +13,10 @@ var nopt        = require("nopt");
 var inflection  = require('inflection');
 
 Class('Mg').includes(CustomEventSupport)({
-  SCHEMA_MIGRATIONS_FILE : './migrations/data/schema_migrations.json',
+  MIGRATIONS_SCHEMA_FILE : './migrations/data/migrations_schema.json',
   prototype : {
     options : null,
-    schemaMigrations : null,
+    migrationsSchema : null,
     knownOpts : {
       "create"    : String,
       "migrate"   : [Number, null],
@@ -52,16 +52,22 @@ Class('Mg').includes(CustomEventSupport)({
 
     createDependencyFiles : function() {
       if (!fs.existsSync('./migrations/data')) {
-        this.dispatch('log', {message : 'Creating ./' + this.constructor.SCHEMA_MIGRATIONS_FILE.split('/')[1] + ' directory.'});
+        this.dispatch('log', {message : 'Creating ./' + this.constructor.MIGRATIONS_SCHEMA_FILE.split('/')[1] + ' directory.'});
         mkdirp.sync('./migrations/data', 0744);
       }
 
-      if (!fs.existsSync(this.constructor.SCHEMA_MIGRATIONS_FILE)) {
-        this.dispatch('log', {message : 'Creating ' + this.constructor.SCHEMA_MIGRATIONS_FILE + ' file.'});
-        fs.writeFileSync(this.constructor.SCHEMA_MIGRATIONS_FILE, "{}", 'utf8');
-        this.schemaMigrations = JSON.parse(fs.readFileSync(this.constructor.SCHEMA_MIGRATIONS_FILE, 'utf8'));
+      if (!fs.existsSync(this.constructor.MIGRATIONS_SCHEMA_FILE)) {
+        this.dispatch('log', {message : 'Creating ' + this.constructor.MIGRATIONS_SCHEMA_FILE + ' file.'});
+
+        var schema = {
+          versions : {},
+          last : null
+        }
+
+        fs.writeFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, JSON.stringify(schema, null, 2), 'utf8');
+        this.migrationsSchema = JSON.parse(fs.readFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, 'utf8'));
       } else {
-        this.schemaMigrations = JSON.parse(fs.readFileSync(this.constructor.SCHEMA_MIGRATIONS_FILE, 'utf8'));
+        this.migrationsSchema = JSON.parse(fs.readFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, 'utf8'));
       }
 
       return this;
@@ -79,13 +85,17 @@ Class('Mg').includes(CustomEventSupport)({
       } else {
         this.dispatch('log', {message : 'Creating ./migrations/' + fileName + '.js migration.'});
 
-        fs.createReadStream('./lib/migration_template.js').pipe(fs.createWriteStream('./migrations/' + fileName + '.js'));
+        var template = fs.readFileSync('./lib/migration_template.js', 'utf8');
 
-        this.schemaMigrations[UTCTimestamp] = name;
+        template = template.replace('{{name}}', inflection.classify(name));
 
-        var schema = JSON.stringify(this.schemaMigrations, null, 2);
+        fs.writeFileSync('./migrations/' + fileName + '.js', template, 'utf8');
 
-        fs.writeFileSync(this.constructor.SCHEMA_MIGRATIONS_FILE, schema , 'utf8');
+        this.migrationsSchema.versions[UTCTimestamp] = name;
+
+        var schema = JSON.stringify(this.migrationsSchema, null, 2);
+
+        fs.writeFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, schema , 'utf8');
       }
     },
 
