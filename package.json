@@ -23,6 +23,7 @@
   "dependencies": {
     "colors": "^1.0.3",
     "inflection": "^1.5.3",
+    "mkdirp": "^0.5.0",
     "mysql": "^2.5.4",
     "neon": "^2.0.0",
     "nopt": "^3.0.1"

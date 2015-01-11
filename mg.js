@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 
 require('colors');
-var fs    = require('fs');
+var fs      = require('fs');
+var mkdirp  =  require('mkdirp')
 
 require('neon');
 require('neon/stdlib/custom_event');
 require('neon/stdlib/custom_event_support');
 require('neon/stdlib/node_support');
 
-
 var nopt        = require("nopt");
 var inflection  = require('inflection');
 
 Class('Mg').includes(CustomEventSupport)({
+  SCHEMA_MIGRATIONS_FILE : './migrations/data/schema_migrations.json',
   prototype : {
     options : null,
+    schemaMigrations : null,
     knownOpts : {
       "create"    : String,
       "migrate"   : [Number, null],
@@ -29,9 +31,12 @@ Class('Mg').includes(CustomEventSupport)({
     },
 
     init : function() {
+      this.options = nopt(this.knownOpts, this.shortHands, process.argv, 2);
+
       this.bind('error', function(data) {
         console.error(data.message.red);
         console.log('Use: mg -h for help'.green);
+        this.exit();
       });
 
       this.bind('log', function(data) {
@@ -42,18 +47,52 @@ Class('Mg').includes(CustomEventSupport)({
         console.log(data.message);
       });
 
-      this.options = nopt(this.knownOpts, this.shortHands, process.argv, 2);
+      this.createDependencyFiles();
     },
 
-    exit : function(){
-      process.exit(1);
+    createDependencyFiles : function() {
+      if (!fs.existsSync('./migrations/data')) {
+        this.dispatch('log', {message : 'Creating ./' + this.constructor.SCHEMA_MIGRATIONS_FILE.split('/')[1] + ' directory.'});
+        mkdirp.sync('./migrations/data', 0744);
+      }
+
+      if (!fs.existsSync(this.constructor.SCHEMA_MIGRATIONS_FILE)) {
+        this.dispatch('log', {message : 'Creating ' + this.constructor.SCHEMA_MIGRATIONS_FILE + ' file.'});
+        fs.writeFileSync(this.constructor.SCHEMA_MIGRATIONS_FILE, "{}", 'utf8');
+        this.schemaMigrations = JSON.parse(fs.readFileSync(this.constructor.SCHEMA_MIGRATIONS_FILE, 'utf8'));
+      } else {
+        this.schemaMigrations = JSON.parse(fs.readFileSync(this.constructor.SCHEMA_MIGRATIONS_FILE, 'utf8'));
+      }
+
+      return this;
+    },
+
+    createMigration : function(name) {
+      var now = new Date;
+      var UTCTimestamp = Date.UTC(now.getUTCFullYear(),now.getUTCMonth(), now.getUTCDate(),
+        now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds(), now.getUTCMilliseconds());
+
+      var fileName = UTCTimestamp + '_' + name;
+
+      if (fs.existsSync(fileName)) {
+        this.dispatch('error', {message : 'File ' + fileName + ' already exists'});
+      } else {
+        this.dispatch('log', {message : 'Creating ./migrations/' + fileName + '.js migration.'});
+
+        fs.createReadStream('./lib/migration_template.js').pipe(fs.createWriteStream('./migrations/' + fileName + '.js'));
+
+        this.schemaMigrations[UTCTimestamp] = name;
+
+        var schema = JSON.stringify(this.schemaMigrations, null, 2);
+
+        fs.writeFileSync(this.constructor.SCHEMA_MIGRATIONS_FILE, schema , 'utf8');
+      }
     },
 
     showHelp : function() {
       var help = fs.readFileSync('./lib/help.txt', 'utf8');
 
       this.dispatch('info', {message : help});
-      console.log(this.options)
       this.exit();
     },
 
@@ -75,7 +114,7 @@ Class('Mg').includes(CustomEventSupport)({
         }
         // create handler
         var name = inflection.underscore(this.options.create);
-        this.dispatch('log', {message : 'Creating ' + name + ' migragion.'});
+        this.createMigration(name);
       }
 
       if (this.options.migrate) {
@@ -102,7 +141,11 @@ Class('Mg').includes(CustomEventSupport)({
         }
       }
 
-      console.log(this.options)
+      return this;
+    },
+
+    exit : function(){
+      process.exit(1);
     }
   }
 });
