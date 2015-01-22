@@ -14,6 +14,7 @@ var inflection  = require('inflection');
 
 Class('Mg').includes(CustomEventSupport)({
   MIGRATIONS_SCHEMA_FILE : './migrations/data/migrations_schema.json',
+  LAST_VERSION_FILE : './migrations/data/last_version.json',
   prototype : {
     options : null,
     migrationsSchema : null,
@@ -60,15 +61,24 @@ Class('Mg').includes(CustomEventSupport)({
         this.dispatch('log', {message : 'Creating ' + this.constructor.MIGRATIONS_SCHEMA_FILE + ' file.'});
 
         var schema = {
-          versions : {},
-          last : null
+          versions : []
         }
 
         fs.writeFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, JSON.stringify(schema, null, 2), 'utf8');
-        this.migrationsSchema = JSON.parse(fs.readFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, 'utf8'));
-      } else {
-        this.migrationsSchema = JSON.parse(fs.readFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, 'utf8'));
       }
+
+      if (!fs.existsSync(this.constructor.LAST_VERSION_FILE)) {
+        this.dispatch('log', {message : 'Creating ' + this.constructor.LAST_VERSION_FILE + ' file.'});
+
+        var lastVersion = {
+          last : null
+        }
+
+        fs.writeFileSync(this.constructor.LAST_VERSION_FILE, JSON.stringify(lastVersion, null, 2), 'utf8');
+      }
+
+      this.migrationsSchema = JSON.parse(fs.readFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, 'utf8'));
+      this.lastVersion = JSON.parse(fs.readFileSync(this.constructor.LAST_VERSION_FILE, 'utf8'));
 
       return this;
     },
@@ -91,7 +101,7 @@ Class('Mg').includes(CustomEventSupport)({
 
         fs.writeFileSync('./migrations/' + fileName + '.js', template, 'utf8');
 
-        this.migrationsSchema.versions[UTCTimestamp] = name;
+        this.migrationsSchema.versions.push([UTCTimestamp] + '_' + name);
 
         var schema = JSON.stringify(this.migrationsSchema, null, 2);
 
@@ -107,6 +117,8 @@ Class('Mg').includes(CustomEventSupport)({
     },
 
     run : function() {
+
+      var magnesium = this;
 
       if (this.options.argv.original.length === 0 || this.options.help) {
         this.showHelp();
@@ -128,6 +140,7 @@ Class('Mg').includes(CustomEventSupport)({
       }
 
       var mgFile = this.migrationsSchema;
+      var lastVersion = this.lastVersion;
 
       if (this.options.migrate) {
         if (this.options.create || this.options.rollback) {
@@ -137,24 +150,27 @@ Class('Mg').includes(CustomEventSupport)({
         if (this.options.migrate === 1) {
           this.dispatch('info', {message : 'Migrating to last version'});
 
-          for (version in mgFile.versions) {
-            if (version > mgFile.last) {
-              this.dispatch('log', {message : 'Migrating version ' + version + ' | ' + mgFile.versions[version]});
-              var mg = require(process.cwd() + '/migrations/' + version + '_' + mgFile.versions[version] + '.js');
+          mgFile.versions.forEach(function(item) {
+            var version = parseInt(item.match(/^\d+/)[0], 10);
+
+            if (version > lastVersion.last) {
+              magnesium.dispatch('log', {message : 'Migrating version ' + version + ' | ' + item});
+
+              var mg = require(process.cwd() + '/migrations/' + item + '.js');
 
               mg.up();
 
-              mgFile.last = version;
+              lastVersion.last = version;
             }
-          }
+          });
 
-          var schema = JSON.stringify(mgFile, null, 2);
+          lastVersion = JSON.stringify(lastVersion, null, 2);
 
-          this.dispatch('info', {message : 'Writing Migration Schema file'});
-          fs.writeFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, schema , 'utf8');
+          this.dispatch('info', {message : 'Writing Migration Version file'});
+          fs.writeFileSync(this.constructor.LAST_VERSION_FILE, lastVersion , 'utf8');
 
           this.dispatch('log', {message : 'Finished'});
-          this.exit();
+          // this.exit();
 
         } else if (this.options.migrate !== 1) {
           this.dispatch('log', {message : 'Migrating to ' + this.options.migrate +' version'});
