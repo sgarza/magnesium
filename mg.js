@@ -85,7 +85,7 @@ Class('Mg').includes(CustomEventSupport)({
       } else {
         this.dispatch('log', {message : 'Creating ./migrations/' + fileName + '.js migration.'});
 
-        var template = fs.readFileSync('lib/migration_template.js', 'utf8');
+        var template = fs.readFileSync(__dirname + '/lib/migration_template.js', 'utf8');
 
         template = template.replace('{{name}}', inflection.classify(name));
 
@@ -100,7 +100,7 @@ Class('Mg').includes(CustomEventSupport)({
     },
 
     showHelp : function() {
-      var help = fs.readFileSync('lib/help.txt', 'utf8');
+      var help = fs.readFileSync(__dirname + '/lib/help.txt', 'utf8');
 
       this.dispatch('info', {message : help});
       this.exit();
