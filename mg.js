@@ -127,13 +127,35 @@ Class('Mg').includes(CustomEventSupport)({
         this.createMigration(name);
       }
 
+      var mgFile = this.migrationsSchema;
+
       if (this.options.migrate) {
         if (this.options.create || this.options.rollback) {
           this.showHelp();
         }
 
         if (this.options.migrate === 1) {
-          this.dispatch('log', {message : 'Migrating to last version'});
+          this.dispatch('info', {message : 'Migrating to last version'});
+
+          for (version in mgFile.versions) {
+            if (version > mgFile.last) {
+              this.dispatch('log', {message : 'Migrating version ' + version + ' | ' + mgFile.versions[version]});
+              var mg = require(process.cwd() + '/migrations/' + version + '_' + mgFile.versions[version] + '.js');
+
+              mg.up();
+
+              mgFile.last = version;
+            }
+          }
+
+          var schema = JSON.stringify(mgFile, null, 2);
+
+          this.dispatch('info', {message : 'Writing Migration Schema file'});
+          fs.writeFileSync(this.constructor.MIGRATIONS_SCHEMA_FILE, schema , 'utf8');
+
+          this.dispatch('log', {message : 'Finished'});
+          this.exit();
+
         } else if (this.options.migrate !== 1) {
           this.dispatch('log', {message : 'Migrating to ' + this.options.migrate +' version'});
         }
